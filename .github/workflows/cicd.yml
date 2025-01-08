@@ -17,7 +17,7 @@ jobs:
       - name: Build Docker image
         run: docker build -t itslynn/nextjs-app .
       - name: Login to DockerHub
-        run: docker login -u ${{ secrets.DOCKERHUB_USERNAME }} -p ${{ secrets.DOCKERHUB_PASSWORD }}
+        run: docker login -u ${{ secrets.DOCKERHUB_USERNAME }} -p ${{ secrets.DOCKERHUB_PASSWORD }} --password-stdin
       - name: Publish image to DockerHub
         run: docker push itslynn/nextjs-app:latest
 
