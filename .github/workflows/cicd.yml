@@ -1,34 +1,56 @@
-name: Deploy Next.js application
+name: CI — Lint & Build
+
+# ─────────────────────────────────────────────────────────────────────────────
+# This workflow runs on every push and pull request to ensure the codebase
+# lints cleanly and builds without errors.
+#
+# Automatic deployment to AWS EC2 is NOT included here because it requires:
+#   1. A self-hosted GitHub Actions runner configured on the EC2 instance, OR
+#   2. SSH deploy keys / AWS credentials stored as repository secrets.
+#
+# When those prerequisites are available, a separate "cd.yml" workflow can be
+# added following the deployment guide in the README.
+# ─────────────────────────────────────────────────────────────────────────────
 
 on:
   push:
     branches:
-      - deploy-with-docker-ec2
+      - main
+      - "feature/**"
+      - "fix/**"
+  pull_request:
+    branches:
       - main
 
 jobs:
-  build:
+  ci:
+    name: Lint & Build
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout
+      # ── Checkout ────────────────────────────────────────────────────────────
+      - name: Checkout repository
         uses: actions/checkout@v4
-      - name: Create .env file
-        run: echo "MONGO_PASSWORD=${{ secrets.MONGO_PASSWORD }}" >> .env && echo "SITE_URL=${{ secrets.SITE_URL }}" >> .env
-      - name: Build Docker image
-        run: docker build -t itslynn/nextjs-app:latest .
-      - name: Login to DockerHub
-        run: echo ${{ secrets.DOCKER_PASSWORD }} | docker login -u ${{ secrets.DOCKER_USERNAME }} --password-stdin
 
-      - name: Publish image to DockerHub
-        run: docker push itslynn/nextjs-app:latest
+      # ── Node.js setup with npm cache ─────────────────────────────────────
+      - name: Set up Node.js 20 LTS
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
 
-  deploy:
-    needs: build
-    runs-on: self-hosted
-    steps:
-      - name: Pull image from DockerHub
-        run: docker pull itslynn/nextjs-app:latest
-      - name: Delete old container
-        run: docker rm -f nextjs-app-container
-      - name: Run Docker container
-        run: docker run -d -p 3000:3000 --name nextjs-app-container itslynn/nextjs-app
+      # ── Install dependencies ──────────────────────────────────────────────
+      - name: Install dependencies
+        run: npm ci --frozen-lockfile
+
+      # ── Lint ──────────────────────────────────────────────────────────────
+      - name: Run ESLint
+        run: npm run lint
+
+      # ── Production build ──────────────────────────────────────────────────
+      - name: Build Next.js application
+        run: npm run build
+        env:
+          NEXT_TELEMETRY_DISABLED: 1
+          # Add any public env vars required at build time here, e.g.:
+          # NEXT_PUBLIC_SITE_URL: ${{ vars.SITE_URL }}
